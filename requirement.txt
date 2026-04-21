@@ -1,0 +1,10 @@
+flask
+pymupdf
+sentence-transformers
+scikit-learn
+numpy
+pandas
+transformers
+torch
+reportlab
+openai

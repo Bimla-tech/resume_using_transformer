@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Results — {{ data.job_role }} — AI Resume Intelligence</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+/* ── Result-page-only extras ── */
+.skill-tier-label{font-size:10px;font-weight:800;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:7px;}
+.tag-core    {background:rgba(74,222,128,0.12);border:1px solid rgba(74,222,128,0.35);color:#4ade80;}
+.tag-optional{background:rgba(96,165,250,0.12);border:1px solid rgba(96,165,250,0.35);color:#60a5fa;}
+.tag-miss-core{background:rgba(248,113,113,0.14);border:1px solid rgba(248,113,113,0.4);color:#f87171;font-weight:700;}
+.tag-miss-opt {background:rgba(251,191,36,0.12); border:1px solid rgba(251,191,36,0.35); color:#fbbf24;}
+.method-badge{font-size:9px;padding:1px 6px;border-radius:4px;font-weight:700;margin-left:4px;vertical-align:middle;}
+.mb-exact   {background:rgba(74,222,128,0.2); color:#4ade80;}
+.mb-semantic{background:rgba(96,165,250,0.2); color:#60a5fa;}
+.mb-none    {background:rgba(248,113,113,0.15);color:#f87171;}
+.weight-bar-wrap{background:rgba(255,255,255,0.05);border-radius:6px;height:10px;overflow:hidden;margin-top:10px;}
+.weight-bar     {height:100%;border-radius:6px;background:linear-gradient(90deg,#4ade80,#22d3ee);transition:width 1s ease;}
+.weight-bar-red {background:linear-gradient(90deg,#e94560,#f59e0b);}
+.score-breakdown{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:16px;}
+@media(max-width:600px){.score-breakdown{grid-template-columns:1fr;}}
+.breakdown-item{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:12px 14px;}
+.breakdown-val {font-size:22px;font-weight:900;margin-bottom:2px;}
+.breakdown-lbl {font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0.5px;}
+.breakdown-bar {margin-top:6px;}
+.miss-critical {font-size:11px;padding:2px 8px;border-radius:5px;background:rgba(248,113,113,0.15);color:#f87171;font-weight:800;margin-left:6px;}
+.miss-optional {font-size:11px;padding:2px 8px;border-radius:5px;background:rgba(251,191,36,0.12);color:#fbbf24;font-weight:700;margin-left:6px;}
+.role-db-note  {font-size:11px;color:var(--muted);margin-top:6px;font-style:italic;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">🧠</div>
+  <div>
+    <h1>AI Resume Intelligence System</h1>
+    <p>Strict Role Analysis · <strong style="color:#e94560">{{ data.job_role }}</strong>
+       {% if data.matched_role != data.job_role %}
+       <span style="color:var(--muted);">(matched to: {{ data.matched_role }})</span>
+       {% endif %}
+    </p>
+  </div>
+  <a href="/" class="btn btn-outline btn-sm" style="margin-left:auto;">← New Analysis</a>
+</div>
+
+<div class="main">
+
+  <!-- ── Role Match Banner ── -->
+  <div class="role-banner">
+    <div>
+      <div class="role-banner-label">Weighted Role Match</div>
+      {% set wm = data.weighted_match_pct %}
+      {% set wc = '#4ade80' if wm >= 70 else ('#fbbf24' if wm >= 45 else '#f87171') %}
+      <div style="font-size:52px;font-weight:900;color:{{ wc }};line-height:1;">{{ wm }}%</div>
+      <div class="role-db-note">core × {{ 2 }} + optional × {{ 1 }}</div>
+    </div>
+    <div class="role-banner-divider"></div>
+    <div>
+      <div class="role-banner-label">Target Job Role</div>
+      <div class="role-banner-role">{{ data.job_role }}</div>
+      <div class="role-banner-sub">{{ data.filename }}</div>
+    </div>
+    <div class="role-banner-divider"></div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <div style="text-align:center;"><div style="font-size:26px;font-weight:900;color:#4ade80;">{{ data.resume_score }}</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;">Resume<br>Score</div></div>
+      <div style="text-align:center;"><div style="font-size:26px;font-weight:900;color:#60a5fa;">{{ data.ats_score }}</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;">ATS<br>Score</div></div>
+      <div style="text-align:center;"><div style="font-size:26px;font-weight:900;color:#4ade80;">{{ data.matched_skills.core|length + data.matched_skills.optional|length }}</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;">Skills<br>Matched</div></div>
+      <div style="text-align:center;"><div style="font-size:26px;font-weight:900;color:#f87171;">{{ data.missing_skills.core|length + data.missing_skills.optional|length }}</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;">Skills<br>Missing</div></div>
+    </div>
+  </div>
+
+  <!-- ── Score Dashboard ── -->
+  <div class="sec-hdr"><span>📊</span> Score Dashboard</div>
+  <div class="card" style="margin-bottom:22px;">
+
+    <div class="scores-row">
+      {% for label, val, color in [
+        ('Resume Score',   data.resume_score,        '#4ade80' if data.resume_score >= 70 else ('#fbbf24' if data.resume_score >= 50 else '#f87171')),
+        ('ATS Score',      data.ats_score,            '#60a5fa' if data.ats_score >= 70    else ('#fbbf24' if data.ats_score >= 50    else '#f87171')),
+        ('Role Match',     data.weighted_match_pct,  '#a78bfa' if data.weighted_match_pct >= 70 else ('#fbbf24' if data.weighted_match_pct >= 45 else '#f87171')),
+      ] %}
+      <div class="score-ring">
+        {% set off = (314.16 - (val / 100) * 314.16)|round(1) %}
+        {% set grade = 'Excellent' if val >= 75 else ('Good' if val >= 60 else ('Average' if val >= 40 else 'Low')) %}
+        <svg width="126" height="126" viewBox="0 0 126 126">
+          <circle cx="63" cy="63" r="50" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="10"/>
+          <circle cx="63" cy="63" r="50" fill="none" stroke="{{ color }}" stroke-width="10"
+            stroke-dasharray="314.16" stroke-dashoffset="{{ off }}"
+            stroke-linecap="round" transform="rotate(-90 63 63)"
+            style="transition:stroke-dashoffset 1.2s ease"/>
+          <text x="63" y="58" text-anchor="middle" fill="white" font-size="22" font-weight="800">{{ val }}</text>
+          <text x="63" y="72" text-anchor="middle" fill="#7a7a9a" font-size="10">{% if label == 'Role Match' %}%{% else %}/100{% endif %}</text>
+        </svg>
+        <div class="score-label">{{ label }}</div>
+        <div class="score-grade" style="color:{{ color }};">{{ grade }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Score breakdown explanation -->
+    <div class="score-breakdown">
+      <div class="breakdown-item">
+        <div class="breakdown-val" style="color:#a78bfa;">{{ data.weighted_match_pct }}%</div>
+        <div class="breakdown-lbl">Weighted Role Match (50% of score)</div>
+        <div class="breakdown-bar">
+          <div class="progress-wrap"><div class="progress-bar" style="width:{{ data.weighted_match_pct }}%;background:linear-gradient(90deg,#a78bfa,#c084fc)"></div></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+          Core matched: {{ data.matched_skills.core|length }}/{{ data.role_def.core|length }} (×2) &nbsp;|&nbsp;
+          Optional: {{ data.matched_skills.optional|length }}/{{ data.role_def.optional|length }} (×1)
+        </div>
+      </div>
+      <div class="breakdown-item">
+        <div class="breakdown-val" style="color:#4ade80;">{{ data.resume_score }}</div>
+        <div class="breakdown-lbl">Resume Score (0-100)</div>
+        <div class="breakdown-bar">
+          <div class="progress-wrap"><div class="progress-bar progress-green" style="width:{{ data.resume_score }}%"></div></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">50% role match + 25% sections + 15% achievements + 10% length</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="breakdown-val" style="color:#60a5fa;">{{ data.ats_score }}</div>
+        <div class="breakdown-lbl">ATS Compatibility (0-100)</div>
+        <div class="breakdown-bar">
+          <div class="progress-wrap"><div class="progress-bar progress-blue" style="width:{{ data.ats_score }}%"></div></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">Contact info + sections + skill keywords + bullets + dates</div>
+      </div>
+      <div class="breakdown-item">
+        <div class="breakdown-val" style="color:#fbbf24;">{{ data.sections.values()|list|sum }}</div>
+        <div class="breakdown-lbl">Sections Present (out of 8)</div>
+        <div class="breakdown-bar">
+          {% set sec_pct = (data.sections.values()|list|sum / 8 * 100)|round %}
+          <div class="progress-wrap"><div class="progress-bar" style="width:{{ sec_pct }}%;background:linear-gradient(90deg,#fbbf24,#f59e0b)"></div></div>
+        </div>
+        <div class="sections-grid" style="margin-top:8px;">
+          {% set labels = {'summary':'Summary','experience':'Experience','education':'Education','skills':'Skills','projects':'Projects','certifications':'Certs','achievements':'Achievements','contact':'Contact'} %}
+          {% for key, label in labels.items() %}
+          <div class="sec-dot"><div class="dot {{ 'dot-green' if data.sections.get(key) else 'dot-red' }}"></div><span style="color:{{ 'var(--text)' if data.sections.get(key) else 'var(--muted)' }};font-size:11px;">{{ label }}</span></div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Skills: Matched (strictly role-filtered) ── -->
+  <div class="sec-hdr"><span>✅</span> Skills You Have for "{{ data.matched_role }}"</div>
+  <div class="card" style="margin-bottom:22px;">
+    <div class="card-title"><span>🔬</span>
+      Hybrid matching: exact keyword + semantic embeddings.
+      Only skills from the role dictionary are shown.
+    </div>
+
+    {% if data.matched_skills.core %}
+    <div class="skill-tier-label">
+      <span style="background:rgba(74,222,128,0.15);color:#4ade80;padding:2px 8px;border-radius:4px;">CORE</span>
+      <span style="font-size:10px;color:var(--muted);">{{ data.matched_skills.core|length }} matched · weight ×2</span>
+    </div>
+    <div class="tags" style="margin-bottom:14px;">
+      {% for skill in data.matched_skills.core %}
+      {% set d = data.skill_details.get(skill, {}) %}
+      <span class="tag tag-core">
+        {{ skill }}
+        <span class="method-badge {{ 'mb-exact' if d.method == 'exact' else ('mb-semantic' if d.method == 'semantic' else 'mb-none') }}">
+          {{ 'exact' if d.method == 'exact' else ('AI' if d.method == 'semantic' else '?') }}
+        </span>
+      </span>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="padding:12px 0;color:var(--danger);font-size:13px;font-weight:700;">⚠️ No core skills matched for {{ data.matched_role }}.</div>
+    {% endif %}
+
+    {% if data.matched_skills.optional %}
+    <div class="skill-tier-label">
+      <span style="background:rgba(96,165,250,0.15);color:#60a5fa;padding:2px 8px;border-radius:4px;">OPTIONAL</span>
+      <span style="font-size:10px;color:var(--muted);">{{ data.matched_skills.optional|length }} matched · weight ×1</span>
+    </div>
+    <div class="tags">
+      {% for skill in data.matched_skills.optional %}
+      {% set d = data.skill_details.get(skill, {}) %}
+      <span class="tag tag-optional">
+        {{ skill }}
+        <span class="method-badge {{ 'mb-exact' if d.method == 'exact' else ('mb-semantic' if d.method == 'semantic' else 'mb-none') }}">
+          {{ 'exact' if d.method == 'exact' else ('AI' if d.method == 'semantic' else '?') }}
+        </span>
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not data.matched_skills.core and not data.matched_skills.optional %}
+    <p style="color:var(--muted);font-size:13px;text-align:center;padding:20px;">No role-specific skills detected in your resume.</p>
+    {% endif %}
+  </div>
+
+  <!-- ── Missing Skills (strict set subtraction) ── -->
+  <div class="sec-hdr"><span>🚫</span> Missing Skills for "{{ data.matched_role }}"</div>
+  <div class="card" style="margin-bottom:22px;">
+    <div class="card-title"><span>🎯</span>
+      Strict gap: missing = role_skills − resume_skills.
+      Skills NOT found by either exact keyword or semantic embedding.
+    </div>
+
+    {% set core_miss = data.missing_skills.core %}
+    {% set opt_miss  = data.missing_skills.optional %}
+
+    {% if core_miss %}
+    <div class="skill-tier-label">
+      <span style="background:rgba(248,113,113,0.15);color:#f87171;padding:2px 8px;border-radius:4px;">CORE — CRITICAL</span>
+      <span style="font-size:10px;color:var(--muted);">{{ core_miss|length }} missing · must fix</span>
+    </div>
+    <div style="margin-bottom:16px;">
+      {% for skill in core_miss %}
+      <div class="missing-skill-item" style="border-color:rgba(248,113,113,0.35);">
+        <span class="missing-skill-name">✗ {{ skill }}</span>
+        <div class="gap-bar-wrap"><div class="gap-bar" style="width:{{ [(data.skill_details.get(skill, {}).get('score', 0) * 100)|round, 100]|min }}%"></div></div>
+        <span class="gap-pct">{{ (data.skill_details.get(skill, {}).get('score', 0) * 100)|round(1) }}% sim</span>
+        <span class="miss-critical">CORE</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if opt_miss %}
+    <div class="skill-tier-label">
+      <span style="background:rgba(251,191,36,0.15);color:#fbbf24;padding:2px 8px;border-radius:4px;">OPTIONAL — RECOMMENDED</span>
+      <span style="font-size:10px;color:var(--muted);">{{ opt_miss|length }} missing</span>
+    </div>
+    <div class="tags">
+      {% for skill in opt_miss %}
+      <span class="tag tag-miss-opt">✗ {{ skill }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not core_miss and not opt_miss %}
+    <div style="text-align:center;padding:28px;">
+      <div style="font-size:40px;margin-bottom:8px;">🌟</div>
+      <p style="color:var(--success);font-weight:700;font-size:15px;">100% role coverage — no skill gaps!</p>
+      <p style="color:var(--muted);font-size:13px;margin-top:4px;">Your resume covers all required skills for {{ data.matched_role }}.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Course Recommendations (per missing skill) ── -->
+  {% if data.course_recommendations %}
+  <div class="sec-hdr"><span>📚</span> Course Recommendations (Per Missing Skill)</div>
+  <div class="card" style="margin-bottom:22px;">
+    <div class="card-title"><span>🎓</span>
+      NLP-matched courses from Coursera · Udemy · edX · YouTube.
+      Core gaps shown first. Only missing skills have courses.
+    </div>
+
+    <!-- Core missing first -->
+    {% for skill in data.missing_skills.core %}
+    {% if data.course_recommendations.get(skill) %}
+    <div class="course-skill-group">
+      <div class="course-skill-title">
+        <span>🚫</span> {{ skill }} <span class="miss-critical">CORE</span>
+      </div>
+      {% for course in data.course_recommendations[skill] %}
+      <div class="course-item">
+        <div class="course-item-info">
+          <div class="course-item-title">{{ course.title }}</div>
+          <div class="course-item-platform">{{ course.platform }} &nbsp;·&nbsp; Relevance: {{ course.relevance }}%</div>
+        </div>
+        {% if course.platform == 'Coursera' %}  <a class="course-link link-coursera" href="{{ course.url }}" target="_blank">🎓 Enroll</a>
+        {% elif course.platform == 'Udemy' %}    <a class="course-link link-udemy"    href="{{ course.url }}" target="_blank">🎓 Enroll</a>
+        {% elif course.platform == 'edX' %}      <a class="course-link link-edx"      href="{{ course.url }}" target="_blank">🎓 Enroll</a>
+        {% elif course.platform == 'YouTube' %}  <a class="course-link link-youtube"  href="{{ course.url }}" target="_blank">▶ Watch Free</a>
+        {% else %}                               <a class="course-link link-default"  href="{{ course.url }}" target="_blank">View</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    <!-- Optional missing next -->
+    {% for skill in data.missing_skills.optional %}
+    {% if data.course_recommendations.get(skill) %}
+    <div class="course-skill-group">
+      <div class="course-skill-title" style="color:var(--warning);">
+        <span>📌</span> {{ skill }} <span class="miss-optional">OPTIONAL</span>
+      </div>
+      {% for course in data.course_recommendations[skill] %}
+      <div class="course-item">
+        <div class="course-item-info">
+          <div class="course-item-title">{{ course.title }}</div>
+          <div class="course-item-platform">{{ course.platform }} &nbsp;·&nbsp; Relevance: {{ course.relevance }}%</div>
+        </div>
+        {% if course.platform == 'Coursera' %}  <a class="course-link link-coursera" href="{{ course.url }}" target="_blank">🎓 Enroll</a>
+        {% elif course.platform == 'Udemy' %}    <a class="course-link link-udemy"    href="{{ course.url }}" target="_blank">🎓 Enroll</a>
+        {% elif course.platform == 'edX' %}      <a class="course-link link-edx"      href="{{ course.url }}" target="_blank">🎓 Enroll</a>
+        {% elif course.platform == 'YouTube' %}  <a class="course-link link-youtube"  href="{{ course.url }}" target="_blank">▶ Watch Free</a>
+        {% else %}                               <a class="course-link link-default"  href="{{ course.url }}" target="_blank">View</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ── Companies / YouTube / Improvements tabs ── -->
+  <div class="sec-hdr"><span>🏢</span> Company Matches & More</div>
+  <div class="card" style="margin-bottom:22px;">
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('companies')">🏢 Companies + LinkedIn</div>
+      <div class="tab" onclick="switchTab('youtube')">▶️ YouTube Courses</div>
+      <div class="tab" onclick="switchTab('improvements')">📈 Improvements</div>
+    </div>
+
+    <div id="tab-companies" class="tab-panel active">
+      {% for c in data.companies %}
+      {% set bc = 'badge-green' if c.match_score >= 70 else ('badge-yellow' if c.match_score >= 50 else 'badge-red') %}
+      <div class="company-item">
+        <div class="company-top">
+          <div>
+            <div class="company-role">{{ c.role }}</div>
+            <div class="company-name">@ {{ c.company }}</div>
+          </div>
+          <span class="badge {{ bc }}">{{ c.match_score }}% match</span>
+        </div>
+        <div class="company-desc">{{ c.snippet }}</div>
+        <div class="company-links">
+          <a class="clink clink-li" href="{{ c.linkedin_search }}"  target="_blank">💼 Apply on LinkedIn</a>
+          <a class="clink clink-li" href="{{ c.linkedin_company }}" target="_blank">🏢 All Jobs</a>
+          <a class="clink clink-gl" href="{{ c.glassdoor }}"        target="_blank">📊 Glassdoor</a>
+          <a class="clink clink-ca" href="{{ c.careers }}"          target="_blank">🌐 Careers</a>
+        </div>
+      </div>
+      {% else %}
+      <p style="color:var(--muted);font-size:13px;padding:20px 0;">No company matches found.</p>
+      {% endfor %}
+    </div>
+
+    <div id="tab-youtube" class="tab-panel">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+        Targeted at missing skills for <strong style="color:var(--accent);">{{ data.job_role }}</strong>. Search terms generated dynamically.
+      </p>
+      {% for y in data.youtube_courses %}
+      <div class="yt-item">
+        <div><div class="yt-title">{{ y.title }}</div><div class="yt-rel">Relevance: {{ y.relevance }}%</div></div>
+        <a class="course-link link-youtube" href="{{ y.youtube_url }}" target="_blank" style="flex-shrink:0;">▶ Watch Free</a>
+      </div>
+      {% else %}
+      <p style="color:var(--success);font-size:13px;padding:20px 0;">No major gaps — no YouTube recommendations needed!</p>
+      {% endfor %}
+    </div>
+
+    <div id="tab-improvements" class="tab-panel">
+      {% for sug in data.suggestions %}
+      {% set cls = '' if sug.priority == 'High' else ('medium' if sug.priority == 'Medium' else 'low') %}
+      <div class="sug-item {{ cls }}">
+        <div class="sug-cat">[{{ sug.priority }}] {{ sug.category }}</div>
+        <div class="sug-text">{{ sug.text }}</div>
+      </div>
+      {% else %}
+      <p style="color:var(--success);font-size:13px;padding:20px 0;">🌟 No major improvements needed — great resume!</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Chat + Cover Letter / Download ── -->
+  <div class="grid-2" style="margin-bottom:22px;">
+
+    <div class="card">
+      <div class="card-title"><span>🤖</span> AI Career Advisor</div>
+      <div class="chips">
+        <button class="chip" onclick="sendQuick('What skills am I missing for this role?')">Missing skills?</button>
+        <button class="chip" onclick="sendQuick('Explain my weighted role match score')">Explain score?</button>
+        <button class="chip" onclick="sendQuick('Which companies should I apply to?')">Best companies?</button>
+        <button class="chip" onclick="sendQuick('What courses should I take for missing skills?')">Which courses?</button>
+        <button class="chip" onclick="sendQuick('How do I prepare for interviews?')">Interview prep?</button>
+      </div>
+      <div class="chat-msgs" id="chatMsgs">
+        <div class="msg msg-bot">
+          👋 Hi! I know your resume and your target role
+          <strong style="color:var(--accent);">{{ data.job_role }}</strong>.
+          Role match: <strong style="color:#a78bfa;">{{ data.weighted_match_pct }}%</strong>.
+          Core missing: <strong style="color:#f87171;">{{ data.missing_skills.core|length }}</strong>.
+          Ask me anything!
+        </div>
+      </div>
+      <div class="chat-in">
+        <input type="text" id="chatInput" placeholder="Ask about missing skills, courses, companies..."
+               onkeypress="if(event.key==='Enter') sendChat()" />
+        <button onclick="sendChat()">➤</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>✉️</span> Cover Letter Builder</div>
+      <div class="cl-form">
+        <div class="form-group">
+          <label>Company *</label>
+          <select id="clCompany">
+            <option value="">— Select company —</option>
+            {% for c in data.companies %}
+            <option value="{{ c.company }}" data-role="{{ c.role }}">{{ c.company }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Role *</label>
+          <input type="text" id="clRole" value="{{ data.job_role }}" />
+        </div>
+        <div class="form-group">
+          <label>Your Name *</label>
+          <input type="text" id="clName" placeholder="Jane Smith" />
+        </div>
+        <div class="form-group">
+          <label>Your Email *</label>
+          <input type="email" id="clEmail" placeholder="jane@email.com" />
+        </div>
+        <div class="form-group">
+          <label>Years of Experience</label>
+          <input type="text" id="clYears" placeholder="4+" />
+        </div>
+        <div class="form-group">
+          <label>Top Achievement</label>
+          <input type="text" id="clAchieve" placeholder="e.g. Improved accuracy by 35%" />
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="generateCL()" style="width:100%;justify-content:center;">
+        ✉️ Generate Cover Letter
+      </button>
+      <div id="clOutput" style="display:none;">
+        <div class="cl-output" id="clText"></div>
+        <div class="btn-group">
+          <button class="btn btn-outline btn-sm" onclick="downloadCL()">📥 Download .txt</button>
+        </div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:18px 0;">
+      <div class="card-title"><span>📥</span> Download Full Report</div>
+      <div class="btn-group">
+        <a class="btn btn-primary" style="text-decoration:none;justify-content:center;flex:1;"
+           href="/download?uid={{ uid }}&format=pdf">📄 PDF Report</a>
+        <a class="btn btn-outline" style="text-decoration:none;"
+           href="/download?uid={{ uid }}&format=txt">📝 TXT</a>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+const UID = "{{ uid }}";
+let coverLetterText = '';
+
+document.getElementById('clCompany').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  if (opt.dataset.role) document.getElementById('clRole').value = opt.dataset.role;
+});
+
+function switchTab(name) {
+  const names = ['companies', 'youtube', 'improvements'];
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', names[i] === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  addUserMsg(msg);
+  const typing = addBotMsg('<div class="spinner" style="width:14px;height:14px;margin:4px;"></div>');
+  try {
+    const r = await fetch('/chat', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg, upload_id: UID})
+    });
+    const d = await r.json();
+    typing.remove();
+    addBotMsg(d.response || d.error || 'Could not respond.');
+  } catch(e) { typing.remove(); addBotMsg('Connection error.'); }
+}
+
+function sendQuick(msg) { document.getElementById('chatInput').value = msg; sendChat(); }
+
+function addUserMsg(text) {
+  const m = document.createElement('div'); m.className = 'msg msg-user'; m.textContent = text;
+  const c = document.getElementById('chatMsgs'); c.appendChild(m); c.scrollTop = c.scrollHeight;
+}
+function addBotMsg(html) {
+  const m = document.createElement('div'); m.className = 'msg msg-bot'; m.innerHTML = html;
+  const c = document.getElementById('chatMsgs'); c.appendChild(m); c.scrollTop = c.scrollHeight;
+  return m;
+}
+
+async function generateCL() {
+  const company = document.getElementById('clCompany').value;
+  const role    = document.getElementById('clRole').value.trim();
+  const name    = document.getElementById('clName').value.trim();
+  const email   = document.getElementById('clEmail').value.trim();
+  const years   = document.getElementById('clYears').value.trim() || '3+';
+  const achieve = document.getElementById('clAchieve').value.trim();
+  if (!company || !role) { alert('Please select a company and role.'); return; }
+  if (!name || !email)   { alert('Please enter your name and email.'); return; }
+  const r = await fetch('/cover-letter', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({uid: UID, company, role, name, email, years_exp: years, achievement: achieve})
+  });
+  const d = await r.json();
+  if (!d.success) { alert('Error: ' + (d.error || 'Failed')); return; }
+  coverLetterText = d.cover_letter;
+  document.getElementById('clText').textContent = coverLetterText;
+  document.getElementById('clOutput').style.display = 'block';
+}
+
+function downloadCL() {
+  if (!coverLetterText) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([coverLetterText], {type: 'text/plain'}));
+  a.download = 'cover_letter.txt'; a.click();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Resume Intelligence System</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- Loading overlay (shown on form submit) -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-card">
+    <div class="spinner"></div>
+    <strong>Analyzing Your Resume</strong>
+    <p id="loadingMsg">Loading AI models and extracting text...</p>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-logo">🧠</div>
+  <div>
+    <h1>Talent-decode</h1>
+    <p>NLP · Semantic Skill Matching · Job Role-Driven Analysis · Missing Skills · Course Recommendations</p>
+  </div>
+  <div class="header-badge">⚡ AI Powered</div>
+</div>
+
+<div class="main">
+
+  <!-- Error Alert -->
+  {% if error %}
+  <div class="alert alert-error">❌ {{ error }}</div>
+  {% endif %}
+
+  <!-- Page title -->
+  <div class="sec-hdr" style="margin-top:0;"><span>🎯</span> Analyze Your Resume</div>
+
+  <div class="grid-2">
+
+    <!-- Left: Form -->
+    <div class="card">
+      <form id="uploadForm" action="/analyze" method="POST" enctype="multipart/form-data" onsubmit="return startAnalysis()">
+
+        <!-- Step 1: Job Role -->
+        <div style="margin-bottom:22px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <span style="background:var(--accent);color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">1</span>
+            <span style="font-size:14px;font-weight:700;color:var(--text);">Enter Your Target Job Role</span>
+          </div>
+          <label class="input-label" for="jobRoleInput">Target Job Role *</label>
+          <input
+            class="job-role-input"
+            type="text"
+            id="jobRoleInput"
+            name="job_role"
+            list="roleOptions"
+            placeholder="e.g. Data Scientist, Machine Learning Engineer, Frontend Developer..."
+            required
+            autocomplete="off"
+          />
+          <datalist id="roleOptions">
+            {% for role in roles %}
+            <option value="{{ role }}">
+            {% endfor %}
+          </datalist>
+          <p class="input-hint">
+            ⚡ Strict role-based filtering — only skills for your chosen role are evaluated.
+            Core skills weight ×2, optional ×1.
+            <a href="#" onclick="document.getElementById('roleModal').style.display='flex';return false;" style="color:var(--accent);text-decoration:none;margin-left:4px;">View all 20 supported roles →</a>
+          </p>
+        </div>
+
+        <!-- Suggestions row -->
+        <div style="margin-bottom:22px;">
+          <div style="font-size:11px;color:var(--muted);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">Popular Roles</div>
+          <div class="chips">
+            <button type="button" class="chip" onclick="setRole('Data Scientist')">Data Scientist</button>
+            <button type="button" class="chip" onclick="setRole('Machine Learning Engineer')">ML Engineer</button>
+            <button type="button" class="chip" onclick="setRole('Frontend Developer')">Frontend Dev</button>
+            <button type="button" class="chip" onclick="setRole('Backend Engineer')">Backend Engineer</button>
+            <button type="button" class="chip" onclick="setRole('DevOps Engineer')">DevOps Engineer</button>
+            <button type="button" class="chip" onclick="setRole('Full Stack Developer')">Full Stack</button>
+            <button type="button" class="chip" onclick="setRole('Cybersecurity Analyst')">Cybersecurity</button>
+            <button type="button" class="chip" onclick="setRole('Data Engineer')">Data Engineer</button>
+            <button type="button" class="chip" onclick="setRole('iOS Developer')">iOS Developer</button>
+            <button type="button" class="chip" onclick="setRole('Product Manager')">Product Manager</button>
+            <button type="button" class="chip" onclick="setRole('Cloud Architect')">Cloud Architect</button>
+            <button type="button" class="chip" onclick="setRole('NLP Engineer')">NLP Engineer</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Upload -->
+        <div style="margin-bottom:22px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <span style="background:var(--primary);color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">2</span>
+            <span style="font-size:14px;font-weight:700;color:var(--text);">Upload Your Resume PDF</span>
+          </div>
+          <div class="upload-area" id="dropZone">
+            <input type="file" name="resume" id="fileInput" accept=".pdf" required />
+            <span class="upload-icon">📋</span>
+            <strong>Click to browse or drag & drop</strong>
+            <p>PDF only &nbsp;·&nbsp; Max 16 MB</p>
+            <p class="file-name" id="fileNameText"></p>
+          </div>
+        </div>
+
+        <!-- Step 3: Submit -->
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <span style="background:var(--success);color:#000;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">3</span>
+            <span style="font-size:14px;font-weight:700;color:var(--text);">Run AI Analysis</span>
+          </div>
+          <button class="btn btn-primary" id="analyzeBtn" type="submit" disabled>
+            ⚡ Analyze Resume for This Role
+          </button>
+          <p style="font-size:11px;color:var(--muted);margin-top:10px;">
+            ⏱ First run: 20–40s (model loading) &nbsp;·&nbsp; Subsequent: ~5s
+          </p>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- Right: What you get -->
+    <div>
+      <div class="card" style="margin-bottom:18px;">
+        <div class="card-title"><span>✨</span> Job-Role Driven Analysis</div>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--muted);">
+          <div>🎯 <strong style="color:var(--text)">Role-Specific Scoring</strong> — Resume score computed against your target role using semantic similarity, not generic templates</div>
+          <div>🔬 <strong style="color:var(--text)">NLP Skill Extraction</strong> — Sentence-transformer embeddings, no keyword lists or hardcoded rules</div>
+          <div>🚫 <strong style="color:var(--text)">Missing Skills Section</strong> — AI identifies exactly which skills your resume lacks for this specific role</div>
+          <div>📚 <strong style="color:var(--text)">Per-Skill Course Recommendations</strong> — Coursera, Udemy, edX, and YouTube, matched by NLP similarity to each gap</div>
+          <div>🏢 <strong style="color:var(--text)">Company Matching + LinkedIn Links</strong> — Direct apply links for best-matched employers</div>
+          <div>🤖 <strong style="color:var(--text)">Career Chatbot</strong> — Resume-aware advisor that knows your role and skill gaps</div>
+          <div>📥 <strong style="color:var(--text)">PDF / TXT Report</strong> — Full downloadable analysis report</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span>🧠</span> How the AI Works</div>
+        <div style="display:flex;flex-direction:column;gap:9px;">
+          {% for step, desc in [
+            ('Extract', 'PDF text extracted with PyMuPDF'),
+            ('Embed',   'Resume + job role encoded using sentence-transformers (all-MiniLM-L6-v2)'),
+            ('Skills',  'Skills extracted via cosine similarity against a 200-term seed corpus'),
+            ('Gap',     'Job role skills derived dynamically, then compared to resume coverage'),
+            ('Match',   'Resume score = how well your text aligns semantically with the target role'),
+            ('Courses', 'Each missing skill matched to best courses in Coursera/Udemy/edX database'),
+          ] %}
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <span style="background:rgba(233,69,96,0.15);color:var(--accent);padding:2px 8px;border-radius:4px;font-size:10px;font-weight:800;flex-shrink:0;margin-top:2px;">{{ step }}</span>
+            <span style="font-size:12px;color:var(--muted);">{{ desc }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /grid-2 -->
+</div><!-- /main -->
+
+<script>
+const fileInput   = document.getElementById('fileInput');
+const dropZone    = document.getElementById('dropZone');
+const analyzeBtn  = document.getElementById('analyzeBtn');
+const jobInput    = document.getElementById('jobRoleInput');
+const fileNameTxt = document.getElementById('fileNameText');
+
+function checkReady() {
+  analyzeBtn.disabled = !(fileInput.files.length > 0 && jobInput.value.trim().length > 0);
+}
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) {
+    fileNameTxt.textContent = '✓ ' + fileInput.files[0].name + ' (' + (fileInput.files[0].size / 1024).toFixed(1) + ' KB)';
+    fileNameTxt.style.display = 'block';
+  }
+  checkReady();
+});
+
+jobInput.addEventListener('input', checkReady);
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) {
+    // We can't programmatically set file input from drop due to security, but show name
+    fileInput.files = e.dataTransfer.files;
+    fileInput.dispatchEvent(new Event('change'));
+  }
+});
+
+function setRole(role) {
+  jobInput.value = role;
+  checkReady();
+  jobInput.focus();
+}
+
+const loadingMsgs = [
+  'Loading AI models and extracting text...',
+  'Encoding resume with sentence-transformers...',
+  'Computing semantic skill similarity...',
+  'Deriving expected skills for your target role...',
+  'Identifying skill gaps using embeddings...',
+  'Matching courses to missing skills...',
+  'Finding best company matches with ML...',
+  'Generating your personalized results...',
+];
+let msgIdx = 0;
+
+function startAnalysis() {
+  if (!fileInput.files.length || !jobInput.value.trim()) return false;
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('active');
+  const msgEl = document.getElementById('loadingMsg');
+  msgEl.textContent = loadingMsgs[0];
+  const interval = setInterval(() => {
+    msgIdx = (msgIdx + 1) % loadingMsgs.length;
+    msgEl.textContent = loadingMsgs[msgIdx];
+  }, 2800);
+  window.addEventListener('beforeunload', () => clearInterval(interval));
+  return true;
+}
+</script>
+
+<!-- Role Catalog Modal -->
+<div id="roleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:14px;max-width:640px;width:100%;max-height:80vh;overflow-y:auto;padding:28px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+      <strong style="font-size:16px;">📋 Supported Roles ({{ roles|length }})</strong>
+      <button onclick="document.getElementById('roleModal').style.display='none'" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <p style="font-size:12px;color:#7a7a9a;margin-bottom:16px;">Each role has a curated set of core (×2 weight) and optional (×1 weight) skills. Type any role freely — the system also supports semantic matching for unlisted roles.</p>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+      {% for role in roles %}
+      <button onclick="setRole('{{ role }}');document.getElementById('roleModal').style.display='none';"
+              style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:10px 14px;color:#e0e0f0;font-size:13px;text-align:left;cursor:pointer;transition:background 0.2s;"
+              onmouseover="this.style.background='rgba(233,69,96,0.15)'"
+              onmouseout="this.style.background='rgba(255,255,255,0.04)'">
+        {{ role }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
