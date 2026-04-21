@@ -49,7 +49,7 @@ def get_sentence_model():
     """"""
     global _sentence_model
     if _sentence_model is None:
-        for model_name in ('all-mpnet-base-v2', 'all-MiniLM-L6-v2'):
+        for model_name in ('all-MiniLM-L6-v2'):
             try:
                 _sentence_model = SentenceTransformer(model_name)
                 print(f"[INFO] Loaded embedding model: {model_name}")
